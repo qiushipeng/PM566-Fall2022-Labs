@@ -3,7 +3,7 @@ Lab 03
 Qiushi
 2022-09-07
 
-## Step 1. Read in the data
+## Step 1. Read in the data.
 
 First download and then read in with data.table:fread()
 
