@@ -111,6 +111,7 @@ Table grouped by obesity level.
 ```{r table_obesity}
 table_obesity <-
   total_data[ , .(
+  sample_size = 
   FEV_avg = mean(fev, na.rm = TRUE),
   FEV_sd = sd(fev, na.rm = TRUE),
   Asthma_indicator = sum(asthma, na.rm = TRUE) / sum(!is.na(asthma))
