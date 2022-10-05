@@ -1,0 +1,214 @@
+---
+title: "Assignment 02 - Data Viz and Wrangling"
+author: "Qiushi"
+date: "`r Sys.Date()`"
+output: github_document
+always_allow_html: true
+---
+
+Import libraries.
+```{r}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+```
+
+
+### Data Wrangling
+
+Read in data.
+```{r read-data}
+individual <- read.csv("chs_individual.csv")
+regional <- read.csv("chs_regional.csv")
+```
+
+Merge data.
+```{r}
+total_data <- 
+  merge(x = individual,
+        y = regional,
+        by = "townname",
+        all.x = TRUE,
+        all.y = FALSE)
+total_data
+```
+
+## Step 1
+
+Identify and remove duplicates.
+```{r}
+total_data <- unique(total_data)
+dim(total_data)
+```
+Rows matched.
+
+Impute data using the average within the variables “male” and “hispanic”.
+```{r impute-data}
+total_data <- data.table(total_data)
+total_data[ , bmi := fcoalesce(bmi, mean(bmi, na.rm = TRUE)), by = .(male, hispanic)]
+```
+
+## Step 2
+
+Create a new categorical variable named “obesity_level” using the BMI measurement (underweight BMI<14; normal BMI 14-22; overweight BMI 22-24; obese BMI>24).
+```{r categorize}
+total_data[ , obesity_level := fifelse(bmi < 14, "underweight", 
+                                       fifelse(bmi <= 22, "normal", 
+                                               fifelse(bmi <= 24, "overweight", "obese")))]
+total_data
+```
+
+To make sure the variable is rightly coded, create a summary table that contains the minimum BMI, maximum BMI, and the total number of observations per category.
+```{r min-max-total}
+summary_table <- 
+  total_data[ , .(
+  Minimum = min(bmi, na.rm = TRUE),
+  Maximum = max(bmi, na.rm = TRUE),
+  Total_Number = length(bmi)
+), by = obesity_level]
+
+knitr::kable(summary_table)
+
+```
+
+## Step 3
+
+Create another categorical variable named “smoke_gas_exposure” that summarizes “Second Hand Smoke” and “Gas Stove.”
+```{r smoke_gas_exposure}
+total_data[ , smoke_gas_exposure := fifelse((smoke == 0) & (gasstove == 0), "no",
+  fifelse((smoke == 1) & (gasstove == 0), "smoke",
+    fifelse((smoke == 0) & (gasstove == 1), "gasstove", "both")))]
+total_data
+```
+
+## Step 4
+
+Create four summary tables showing the average (or proportion, if binary) and sd of “Forced expiratory volume in 1 second (ml)” and asthma indicator by town, sex, obesity level, and “smoke_gas_exposure.”
+
+Table grouped by town.
+```{r table_town}
+table_town <-
+  total_data[ , .(
+  FEV_avg = mean(fev, na.rm = TRUE),
+  FEV_sd = sd(fev, na.rm = TRUE),
+  Asthma_indicator = sum(asthma, na.rm = TRUE) / sum(!is.na(asthma))
+), by = townname]
+knitr::kable(table_town)
+```
+
+Table grouped by sex
+```{r table_sex}
+table_sex <-
+  total_data[ , .(
+  FEV_avg = mean(fev, na.rm = TRUE),
+  FEV_sd = sd(fev, na.rm = TRUE),
+  Asthma_indicator = sum(asthma, na.rm = TRUE) / sum(!is.na(asthma))
+), by = male]
+knitr::kable(table_sex)
+```
+
+Table grouped by obesity level.
+```{r table_obesity}
+table_obesity <-
+  total_data[ , .(
+  FEV_avg = mean(fev, na.rm = TRUE),
+  FEV_sd = sd(fev, na.rm = TRUE),
+  Asthma_indicator = sum(asthma, na.rm = TRUE) / sum(!is.na(asthma))
+), by = obesity_level]
+knitr::kable(table_obesity)
+```
+
+Table grouped by smoke_gas_exposure.
+```{r table_smoke_gas_exposure}
+table_smoke_gas_exposure <-
+  total_data[ , .(
+  FEV_avg = mean(fev, na.rm = TRUE),
+  FEV_sd = sd(fev, na.rm = TRUE),
+  Asthma_indicator = sum(asthma, na.rm = TRUE) / sum(!is.na(asthma))
+), by = smoke_gas_exposure]
+knitr::kable(table_smoke_gas_exposure)
+```
+
+### Looking at the Data (EDA)
+
+## 1. Facet plot showing scatterplots with regression lines of BMI vs FEV by “townname”.
+
+```{r BMIvsFEV}
+total_data[!is.na(bmi) & !is.na(fev)] %>%
+  ggplot(mapping = aes(x = bmi, y = fev)) + 
+  geom_point(mapping = aes(color = townname)) + 
+  geom_smooth(method = lm) +
+  facet_wrap(~ townname, nrow = 4)
+```
+
+## 2. Stacked histograms of FEV by BMI category and FEV by smoke/gas exposure. Use different color schemes than the ggplot default.
+
+Stacked histogram by BMI category.
+```{r stacked-histogram-1}
+total_data[!is.na(obesity_level) & !is.na(fev)] %>%
+  ggplot(aes(fev, fill = obesity_level)) +
+  geom_histogram(binwidth = 20)
+```
+
+Stacked histogram by smoke/gas exposure
+```{r stacked-histogram-2}
+total_data[!is.na(smoke_gas_exposure) & !is.na(fev)] %>%
+  ggplot(aes(fev, fill = smoke_gas_exposure)) +
+  geom_histogram(binwidth = 20)
+```
+
+## 3. Barchart of BMI by smoke/gas exposure.
+
+```{r barchart}
+bmi_exposure <- total_data[, list(bmi, smoke_gas_exposure)]
+
+group_by(bmi_exposure[!is.na(smoke_gas_exposure) & !is.na(bmi)], smoke_gas_exposure) %>%
+  summarize_each(funs = mean) %>%
+  ggplot() + 
+  geom_col(mapping = aes(y = bmi, x = smoke_gas_exposure, colour = smoke_gas_exposure, fill = smoke_gas_exposure))
+```
+
+## 4. Statistical summary graphs of FEV by BMI and FEV by smoke/gas exposure category.
+
+Statistical summary graphs of FEV by BMI category.
+```{r}
+total_data[!is.na(fev) & !is.na(obesity_level)] %>%
+  ggplot(mapping = aes(x = obesity_level, y = fev)) + 
+    stat_summary(fun.data = mean_sdl, geom = "pointrange") +
+    stat_summary(fun.data = mean_sdl, geom = "errorbar") 
+```
+
+Statistical summary graphs of FEV by smoke/gas exposure category.
+```{r}
+total_data[!is.na(fev) & !is.na(smoke_gas_exposure)] %>%
+  ggplot(mapping = aes(x = smoke_gas_exposure, y = fev)) + 
+    stat_summary(fun.data = mean_sdl, geom = "pointrange") +
+    stat_summary(fun.data = mean_sdl, geom = "errorbar") 
+```
+
+## 5. A leaflet map showing the concentrations of PM2.5 mass in each of the CHS communities.
+
+```{r leaflet}
+library(leaflet)
+pm.pal <- colorNumeric(c('darkgreen','goldenrod','brown'), domain = total_data$pm25_mass)
+
+leaflet(total_data) %>% 
+  addProviderTiles('CartoDB.Positron') %>% 
+  addCircles(
+    lat = ~lat, lng=~lon,
+    label = ~paste0(pm25_mass), color = ~ pm.pal(pm25_mass),
+    opacity = 1, fillOpacity = 1, radius = 500
+    ) %>%
+  addLegend('bottomleft', pal = pm.pal, values = total_data$pm25_mass,
+          title = 'PM2.5 mass', opacity=1)
+```
+
+## 6. Choose a visualization to examine whether PM2.5 mass is associated with FEV.
+
+```{r}
+total_data[!is.na(pm25_mass) & !is.na(fev)] %>%
+  ggplot(mapping = aes(x = pm25_mass, y = fev)) + 
+  geom_point() +
+  geom_smooth(method = lm)
+```
+
