@@ -14,12 +14,28 @@ library(ggplot2)
 ```
 
 
-### Data Wrangling
+## Step 0. Download data, read in, merge, and check
 
-Read in data.
+Download and read in data.
 ```{r read-data}
-individual <- read.csv("chs_individual.csv")
-regional <- read.csv("chs_regional.csv")
+if (!file.exists("chs_individual.csv"))
+  download.file(
+    url = "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/01_chs/chs_individual.csv",
+    destfile = "chs_individual.csv",
+    method   = "libcurl",
+    timeout  = 60
+    )
+
+if (!file.exists("chs_regional.csv"))
+  download.file(
+    url = "https://raw.githubusercontent.com/USCbiostats/data-science-data/master/01_chs/chs_regional.csv",
+    destfile = "chs_regional.csv",
+    method   = "libcurl",
+    timeout  = 60
+    )
+
+individual <- data.table::fread("chs_individual.csv")
+regional <- data.table::fread("chs_regional.csv")
 ```
 
 Merge data.
@@ -30,11 +46,9 @@ total_data <-
         by = "townname",
         all.x = TRUE,
         all.y = FALSE)
-total_data
 ```
 
-## Step 1
-
+Check data.
 Identify and remove duplicates.
 ```{r}
 total_data <- unique(total_data)
@@ -42,20 +56,22 @@ dim(total_data)
 ```
 Rows matched.
 
+## Step 1. Impute missing data.
+
 Impute data using the average within the variables “male” and “hispanic”.
 ```{r impute-data}
 total_data <- data.table(total_data)
 total_data[ , bmi := fcoalesce(bmi, mean(bmi, na.rm = TRUE)), by = .(male, hispanic)]
+total_data[ , fev := fcoalesce(fev, mean(fev, na.rm = TRUE)), by = .(male, hispanic)]
 ```
 
-## Step 2
+## Step 2. Create "obesity_level".
 
 Create a new categorical variable named “obesity_level” using the BMI measurement (underweight BMI<14; normal BMI 14-22; overweight BMI 22-24; obese BMI>24).
 ```{r categorize}
 total_data[ , obesity_level := fifelse(bmi < 14, "underweight", 
                                        fifelse(bmi <= 22, "normal", 
                                                fifelse(bmi <= 24, "overweight", "obese")))]
-total_data
 ```
 
 To make sure the variable is rightly coded, create a summary table that contains the minimum BMI, maximum BMI, and the total number of observations per category.
@@ -67,21 +83,20 @@ summary_table <-
   Total_Number = length(bmi)
 ), by = obesity_level]
 
-knitr::kable(summary_table)
+knitr::kable(summary_table, col.names = c("Obesity Level", "Minimum BMI", "Maximum BMI", "Total Number of Observation"))
 
 ```
 
-## Step 3
+## Step 3 Create "smoke_gas_exposure".
 
 Create another categorical variable named “smoke_gas_exposure” that summarizes “Second Hand Smoke” and “Gas Stove.”
 ```{r smoke_gas_exposure}
 total_data[ , smoke_gas_exposure := fifelse((smoke == 0) & (gasstove == 0), "no",
   fifelse((smoke == 1) & (gasstove == 0), "smoke",
     fifelse((smoke == 0) & (gasstove == 1), "gasstove", "both")))]
-total_data
 ```
 
-## Step 4
+## Step 4 Summary tables.
 
 Create four summary tables showing the average (or proportion, if binary) and sd of “Forced expiratory volume in 1 second (ml)” and asthma indicator by town, sex, obesity level, and “smoke_gas_exposure.”
 
@@ -89,76 +104,89 @@ Table grouped by town.
 ```{r table_town}
 table_town <-
   total_data[ , .(
+  Total_Number = length(fev),
   FEV_avg = mean(fev, na.rm = TRUE),
   FEV_sd = sd(fev, na.rm = TRUE),
   Asthma_indicator = sum(asthma, na.rm = TRUE) / sum(!is.na(asthma))
 ), by = townname]
-knitr::kable(table_town)
+knitr::kable(table_town, col.names = c("Town Name", "Number of Observation", "FEV Avg", "FEV SD", "%Asthma"))
 ```
 
 Table grouped by sex
 ```{r table_sex}
 table_sex <-
   total_data[ , .(
+  Total_Number = length(fev),
   FEV_avg = mean(fev, na.rm = TRUE),
   FEV_sd = sd(fev, na.rm = TRUE),
   Asthma_indicator = sum(asthma, na.rm = TRUE) / sum(!is.na(asthma))
 ), by = male]
-knitr::kable(table_sex)
+table_sex$male[which(table_sex$male == 1)] <- 'Male'
+table_sex$male[which(table_sex$male == 0)] <- 'Female'
+knitr::kable(table_sex, col.names = c("Sex", "Number of Observation", "FEV Avg", "FEV SD", "%Asthma"))
 ```
 
 Table grouped by obesity level.
 ```{r table_obesity}
 table_obesity <-
   total_data[ , .(
-  sample_size = 
+  Total_Number = length(fev),
   FEV_avg = mean(fev, na.rm = TRUE),
   FEV_sd = sd(fev, na.rm = TRUE),
   Asthma_indicator = sum(asthma, na.rm = TRUE) / sum(!is.na(asthma))
 ), by = obesity_level]
-knitr::kable(table_obesity)
+knitr::kable(table_obesity, col.names = c("Obesity Level", "Number of Observation", "FEV Avg", "FEV SD", "%Asthma"))
 ```
 
 Table grouped by smoke_gas_exposure.
 ```{r table_smoke_gas_exposure}
 table_smoke_gas_exposure <-
   total_data[ , .(
+  Total_Number = length(fev),
   FEV_avg = mean(fev, na.rm = TRUE),
   FEV_sd = sd(fev, na.rm = TRUE),
   Asthma_indicator = sum(asthma, na.rm = TRUE) / sum(!is.na(asthma))
 ), by = smoke_gas_exposure]
-knitr::kable(table_smoke_gas_exposure)
+knitr::kable(table_smoke_gas_exposure[!is.na(smoke_gas_exposure)], col.names = c("Somke/Gas Exposure", "Number of Observation", "FEV Avg", "FEV SD", "%Asthma"))
 ```
 
-### Looking at the Data (EDA)
+## Step 5. Figures
 
-## 1. Facet plot showing scatterplots with regression lines of BMI vs FEV by “townname”.
+# Figure 1. Facet plot showing scatterplots with regression lines of BMI vs FEV by “townname”.
 
 ```{r BMIvsFEV}
 total_data[!is.na(bmi) & !is.na(fev)] %>%
   ggplot(mapping = aes(x = bmi, y = fev)) + 
-  geom_point(mapping = aes(color = townname)) + 
+  geom_point(mapping = aes(color = townname), size = 0.5) + 
   geom_smooth(method = lm) +
   facet_wrap(~ townname, nrow = 4)
 ```
 
-## 2. Stacked histograms of FEV by BMI category and FEV by smoke/gas exposure. Use different color schemes than the ggplot default.
+FEV is positively associated with BMI is all towns.
+
+# Figure 2. Stacked histograms of FEV by BMI category and FEV by smoke/gas exposure. Use different color schemes than the ggplot default.
 
 Stacked histogram by BMI category.
+
 ```{r stacked-histogram-1}
 total_data[!is.na(obesity_level) & !is.na(fev)] %>%
   ggplot(aes(fev, fill = obesity_level)) +
   geom_histogram(binwidth = 20)
 ```
 
+FEV is normally distributed. People with normal obesity level takes up most proportion.
+
 Stacked histogram by smoke/gas exposure
+
 ```{r stacked-histogram-2}
 total_data[!is.na(smoke_gas_exposure) & !is.na(fev)] %>%
   ggplot(aes(fev, fill = smoke_gas_exposure)) +
   geom_histogram(binwidth = 20)
 ```
 
-## 3. Barchart of BMI by smoke/gas exposure.
+A large proportion of children have gas stoves in their homes.
+
+# Figure 3. Barchart of BMI by smoke/gas exposure.
 
 ```{r barchart}
 bmi_exposure <- total_data[, list(bmi, smoke_gas_exposure)]
@@ -169,15 +197,20 @@ group_by(bmi_exposure[!is.na(smoke_gas_exposure) & !is.na(bmi)], smoke_gas_expos
   geom_col(mapping = aes(y = bmi, x = smoke_gas_exposure, colour = smoke_gas_exposure, fill = smoke_gas_exposure))
 ```
 
-## 4. Statistical summary graphs of FEV by BMI and FEV by smoke/gas exposure category.
+It seems that BMI has nothing to do with the secondary smoke or gass stove.
+
+# Figure 4. Statistical summary graphs of FEV by BMI and FEV by smoke/gas exposure category.
 
 Statistical summary graphs of FEV by BMI category.
+
 ```{r}
 total_data[!is.na(fev) & !is.na(obesity_level)] %>%
   ggplot(mapping = aes(x = obesity_level, y = fev)) + 
     stat_summary(fun.data = mean_sdl, geom = "pointrange") +
     stat_summary(fun.data = mean_sdl, geom = "errorbar") 
 ```
+
+Obese or overweight children tend to have a higher FEV than those noraml or underweight children.
 
 Statistical summary graphs of FEV by smoke/gas exposure category.
 ```{r}
@@ -187,7 +220,9 @@ total_data[!is.na(fev) & !is.na(smoke_gas_exposure)] %>%
     stat_summary(fun.data = mean_sdl, geom = "errorbar") 
 ```
 
-## 5. A leaflet map showing the concentrations of PM2.5 mass in each of the CHS communities.
+Gass stove and secondary smoke have very little influence on children's FEV.
+
+# 5. A leaflet map showing the concentrations of PM2.5 mass in each of the CHS communities.
 
 ```{r leaflet}
 library(leaflet)
@@ -204,7 +239,7 @@ leaflet(total_data) %>%
           title = 'PM2.5 mass', opacity=1)
 ```
 
-## 6. Choose a visualization to examine whether PM2.5 mass is associated with FEV.
+# 6. Choose a visualization to examine whether PM2.5 mass is associated with FEV.
 
 ```{r}
 total_data[!is.na(pm25_mass) & !is.na(fev)] %>%
