@@ -152,26 +152,29 @@ knitr::kable(table_smoke_gas_exposure[!is.na(smoke_gas_exposure)], col.names = c
 
 ## Step 5. Figures
 
-# Figure 1. Facet plot showing scatterplots with regression lines of BMI vs FEV by “townname”.
+### Figure 1. Facet plot showing scatterplots with regression lines of BMI vs FEV by “townname”.
 
 ```{r BMIvsFEV}
 total_data[!is.na(bmi) & !is.na(fev)] %>%
   ggplot(mapping = aes(x = bmi, y = fev)) + 
   geom_point(mapping = aes(color = townname), size = 0.5) + 
   geom_smooth(method = lm) +
-  facet_wrap(~ townname, nrow = 4)
+  facet_wrap(~ townname, nrow = 4) +
+  labs(x = "BMI", y = "FEV (ml)", title = "Scatterplots with regression lines of BMI vs FEV by “townname”")
 ```
 
 FEV is positively associated with BMI is all towns.
 
-# Figure 2. Stacked histograms of FEV by BMI category and FEV by smoke/gas exposure. Use different color schemes than the ggplot default.
+### Figure 2. Stacked histograms of FEV by BMI category and FEV by smoke/gas exposure. Use different color schemes than the ggplot default.
 
 Stacked histogram by BMI category.
 
 ```{r stacked-histogram-1}
 total_data[!is.na(obesity_level) & !is.na(fev)] %>%
   ggplot(aes(fev, fill = obesity_level)) +
-  geom_histogram(binwidth = 20)
+  geom_histogram(binwidth = 20) +
+  scale_fill_discrete(name = "Obesity Level") +
+  labs(x = "FEV (ml)", y = "Count", title = "Stacked histogram by BMI category")
 ```
 
 FEV is normally distributed. People with normal obesity level takes up most proportion.
@@ -181,12 +184,14 @@ Stacked histogram by smoke/gas exposure
 ```{r stacked-histogram-2}
 total_data[!is.na(smoke_gas_exposure) & !is.na(fev)] %>%
   ggplot(aes(fev, fill = smoke_gas_exposure)) +
-  geom_histogram(binwidth = 20)
+  geom_histogram(binwidth = 20) +
+  scale_fill_discrete(name = "Smoke/Gas Exposure") +
+  labs(x = "FEV (ml)", y = "Count", title = "Stacked histogram by smoke/gas exposure")
 ```
 
 A large proportion of children have gas stoves in their homes.
 
-# Figure 3. Barchart of BMI by smoke/gas exposure.
+### Figure 3. Barchart of BMI by smoke/gas exposure.
 
 ```{r barchart}
 bmi_exposure <- total_data[, list(bmi, smoke_gas_exposure)]
@@ -194,20 +199,22 @@ bmi_exposure <- total_data[, list(bmi, smoke_gas_exposure)]
 group_by(bmi_exposure[!is.na(smoke_gas_exposure) & !is.na(bmi)], smoke_gas_exposure) %>%
   summarize_each(funs = mean) %>%
   ggplot() + 
-  geom_col(mapping = aes(y = bmi, x = smoke_gas_exposure, colour = smoke_gas_exposure, fill = smoke_gas_exposure))
+  geom_col(mapping = aes(y = bmi, x = smoke_gas_exposure, colour = smoke_gas_exposure, fill = smoke_gas_exposure), show.legend = FALSE) +
+  labs(x = "Smoke/Gas Exposure", y = "BMI", title = "Barchart of BMI by smoke/gas exposure")
 ```
 
 It seems that BMI has nothing to do with the secondary smoke or gass stove.
 
-# Figure 4. Statistical summary graphs of FEV by BMI and FEV by smoke/gas exposure category.
+### Figure 4. Statistical summary graphs of FEV by BMI and FEV by smoke/gas exposure category.
 
 Statistical summary graphs of FEV by BMI category.
 
 ```{r}
 total_data[!is.na(fev) & !is.na(obesity_level)] %>%
   ggplot(mapping = aes(x = obesity_level, y = fev)) + 
-    stat_summary(fun.data = mean_sdl, geom = "pointrange") +
-    stat_summary(fun.data = mean_sdl, geom = "errorbar") 
+  stat_summary(fun.data = mean_sdl, geom = "pointrange") +
+  stat_summary(fun.data = mean_sdl, geom = "errorbar") +
+  labs(x = "Obesity Level", y = "FEV (ml)", title = "Statistical summary graphs of FEV by BMI category")
 ```
 
 Obese or overweight children tend to have a higher FEV than those noraml or underweight children.
@@ -216,13 +223,14 @@ Statistical summary graphs of FEV by smoke/gas exposure category.
 ```{r}
 total_data[!is.na(fev) & !is.na(smoke_gas_exposure)] %>%
   ggplot(mapping = aes(x = smoke_gas_exposure, y = fev)) + 
-    stat_summary(fun.data = mean_sdl, geom = "pointrange") +
-    stat_summary(fun.data = mean_sdl, geom = "errorbar") 
+  stat_summary(fun.data = mean_sdl, geom = "pointrange") +
+  stat_summary(fun.data = mean_sdl, geom = "errorbar") +
+  labs(x = "Smoke/Gas Exposure", y = "FEV (ml)", title = "Statistical summary graphs of FEV by smoke/gas exposure category")
 ```
 
 Gass stove and secondary smoke have very little influence on children's FEV.
 
-# 5. A leaflet map showing the concentrations of PM2.5 mass in each of the CHS communities.
+### 5. A leaflet map showing the concentrations of PM2.5 mass in each of the CHS communities.
 
 ```{r leaflet}
 library(leaflet)
@@ -236,15 +244,21 @@ leaflet(total_data) %>%
     opacity = 1, fillOpacity = 1, radius = 500
     ) %>%
   addLegend('bottomleft', pal = pm.pal, values = total_data$pm25_mass,
-          title = 'PM2.5 mass', opacity=1)
+          title = 'PM2.5 mass', opacity = 1) %>%
+  addControl("Leaflet map showing the concentrations of PM2.5 mass in each of the CHS communities", position = "topright")
+
 ```
 
-# 6. Choose a visualization to examine whether PM2.5 mass is associated with FEV.
+Long Beach, Ontario, Riverside have the largest PM2.5 Mass, which means they have very bad air quality.
+
+### 6. Choose a visualization to examine whether PM2.5 mass is associated with FEV.
 
 ```{r}
 total_data[!is.na(pm25_mass) & !is.na(fev)] %>%
   ggplot(mapping = aes(x = pm25_mass, y = fev)) + 
   geom_point() +
-  geom_smooth(method = lm)
+  geom_smooth(method = lm) +
+  labs(x = "PM2.5 Mass", y = "FEV (ml)", title = "Scatterplot with regression line of FEV vs PM2.5")
 ```
 
+It seems that FEV has a negative correlation to PM2.5 Mass, but the correlation seems not significant.
