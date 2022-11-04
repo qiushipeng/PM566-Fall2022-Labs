@@ -1,0 +1,88 @@
+---
+title: "Assignment 03 - Web Scraping and Text Mining"
+author: "Qiushi Peng"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# knitr::opts_chunk$set(echo = TRUE)
+library(httr)
+library(xml2)
+library(tidyverse)
+library(rvest)
+library(stringr)
+```
+
+
+## APIs
+
+#### 1. Using the NCBI API, look for papers that show up under the term “sars-cov-2 trial vaccine.”
+
+Get count.
+```{r}
+website <- xml2::read_html("https://pubmed.ncbi.nlm.nih.gov/?term=sars-cov-2+trial+vaccine")
+counts <- xml2::xml_find_first(website, "/html/body/main/div[9]/div[2]/div[2]/div[1]/div[1]")
+counts <- as.character(counts)
+stringr::str_extract(counts, "[0-9,]+")
+```
+
+Get pubmed ids.
+```{r}
+query_ids <- GET(
+  url   = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi",
+  query = list(
+    db = "pubmed",
+    term = "sars-cov-2 trial vaccine",
+    retmax = 1000
+  )
+)
+
+# Extracting the content of the response of GET
+ids <- httr::content(query_ids)
+```
+
+There are `r stringr::str_extract(counts, "[0-9,]+")` papers.
+
+#### 2. Using the list of pubmed ids you retrieved, download each papers’ details using the query parameter `rettype = abstract`. If you get more than 250 ids, just keep the first 250.
+
+```{r}
+ids <- as.character(ids)
+
+ids <- stringr::str_extract_all(ids, "<Id>[[:digit:]]+</Id>")[[1]]
+
+ids <- stringr::str_remove_all(ids, "</?Id>")
+```
+
+
+Grab publications with Pubmed ID list.
+```{r}
+publications <- GET(
+  url   = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi",
+  query = list(
+    db = "pubmed",
+    id = paste(ids, collapse = ","),
+    retmax = 250,
+    rettype = "abstract"
+    )
+)
+
+# Turning the output into character vector
+publications <- httr::content(publications)
+publications_txt <- as.character(publications)
+```
+
+
+
+
+
+
+#### 3. Create a dataset
+```{r}
+publications_txt
+```
+
+
+
+
+
