@@ -9,6 +9,8 @@ editor_options:
 always_allow_html: true
 ---
 
+*The final report is**[**here**](https://rawcdn.githack.com/qiushipeng/PM566-Fall2022-Labs/d027b8fcd196b893bbad35ad7d71475c29a73389/Lab11/lab11.html)
+
 
 **And remember to set `eval=TRUE`**
 
