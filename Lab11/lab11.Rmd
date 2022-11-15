@@ -9,6 +9,8 @@ editor_options:
 always_allow_html: true
 ---
 
+*The final report is**[**here**]()
+
 
 **And remember to set `eval=TRUE`**
 
@@ -301,8 +303,9 @@ cv_states_today_filter %>%
 
 ```{r}
 ### FINISH CODE HERE
-p <- ggplot(cv_states_today_scatter, aes(x=pop_density, y=deathsper100k, size=population)) + geom_point() + geom_smooth()
+p <- ggplot(cv_states_today_filter, aes(x=pop_density, y=deathsper100k, size=population)) + geom_point() + geom_smooth()
 ggplotly(p)
+
 ```
 
 
@@ -341,7 +344,7 @@ Create a heatmap to visualize `new_cases` for each state on each date greater th
 # Map state, date, and new_cases to a matrix
 library(tidyr)
 cv_states_mat <- cv_states %>% select(state, date, new_cases) %>% dplyr::filter(date>as.Date("2022-06-15"))
-cv_states_mat2 <- as.data.frame(pivot_wider(cv_states_mat, names_from = state, values_from = ________))
+cv_states_mat2 <- as.data.frame(pivot_wider(cv_states_mat, names_from = state, values_from = new_cases))
 rownames(cv_states_mat2) <- cv_states_mat2$date
 cv_states_mat2$date <- NULL
 cv_states_mat2 <- as.matrix(cv_states_mat2)
@@ -353,7 +356,7 @@ plot_ly(x=colnames(cv_states_mat2), y=rownames(cv_states_mat2),
              showscale=T)
 
 # Repeat with newper100k
-cv_states_mat <- cv_states %>% select(state, date, newper100k) %>% dplyr::filter(date>as.Date("2021-06-15"))
+cv_states_mat <- cv_states %>% select(state, date, newper100k) %>% dplyr::filter(date>as.Date("2022-06-15"))
 cv_states_mat2 <- as.data.frame(pivot_wider(cv_states_mat, names_from = state, values_from = ________))
 rownames(cv_states_mat2) <- cv_states_mat2$date
 cv_states_mat2$date <- NULL
@@ -365,10 +368,10 @@ plot_ly(x=colnames(cv_states_mat2), y=rownames(cv_states_mat2),
              showscale=T)
 
 # Create a second heatmap after filtering to only include dates every other week
-filter_dates <- seq(as.Date("2021-06-15"), as.Date("2021-11-01"), by=________)
+filter_dates <- seq(as.Date("2022-06-15"), as.Date("2022-11-01"), by="2 weeks")
 
 cv_states_mat <- cv_states %>% select(state, date, newper100k) %>% filter(date %in% filter_dates)
-cv_states_mat2 <- as.data.frame(pivot_wider(cv_states_mat, names_from = state, values_from = ________))
+cv_states_mat2 <- as.data.frame(pivot_wider(cv_states_mat, names_from = state, values_from = newper100k))
 rownames(cv_states_mat2) <- cv_states_mat2$date
 cv_states_mat2$date <- NULL
 cv_states_mat2 <- as.matrix(cv_states_mat2)
@@ -391,7 +394,7 @@ plot_ly(x=colnames(cv_states_mat2), y=rownames(cv_states_mat2),
 
 ### For specified date
 
-pick.date = "2021-10-15"
+pick.date = "2022-10-15"
 
 # Extract the data for each state by its abbreviation
 cv_per100 <- cv_states %>% filter(date==pick.date) %>% select(state, abb, newper100k, cases, deaths) # select data
@@ -411,13 +414,16 @@ set_map_details <- list(
 )
 
 # Make sure both maps are on the same color scale
-shadeLimit <- 125
+shadeLimit <- 35
 
 # Create the map
 fig <- plot_geo(cv_per100, locationmode = 'USA-states') %>% 
   add_trace(
-    z = ~newper100k, text = ~hover, locations = ~state,
-    color = ~newper100k, colors = 'Purples'
+    z = ~newper100k, 
+    text = ~hover, 
+    locations = ~state,
+    color = ~newper100k, 
+    colors = 'Purples'
   )
 fig <- fig %>% colorbar(title = paste0("Cases per 100k: ", pick.date), limits = c(0,shadeLimit))
 fig <- fig %>% layout(
@@ -461,7 +467,7 @@ fig_Today <- fig
 
 
 ### Plot together 
-________(fig_pick.date, fig_Today, nrows = 2, margin = .05)
+subplot(fig_pick.date, fig_Today, nrows = 2, margin = .05)
 
 ```
 
