@@ -177,5 +177,3 @@ ON a.category_id = b.category_id
 GROUP BY name
 ORDER BY count DESC
 ```
-
-
